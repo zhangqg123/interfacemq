@@ -873,7 +873,7 @@ void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_se
 								OutputDebugString(csDebugValue);
 							}
 							SysFreeString(vtTagName.bstrVal);
-							VariantClear (&vtTagName);
+//							VariantClear (&vtTagName);
 
 							OutputDebugString(_T("[hao]:	---------------------------1"));
 							//获取报警点DESC
@@ -903,8 +903,8 @@ void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_se
 								OutputDebugString(_T("[hao]:	---------------------------5"));
 							}
 							SysFreeString(vtTagDESC.bstrVal);
-							VariantClear (&vtTagDESC);
-							VariantClear (&vtTagValue);
+//							VariantClear (&vtTagDESC);
+//							VariantClear (&vtTagValue);
 
 							OutputDebugString(_T("[hao]:	---------------------------6"));
 							m_bSendAlarm = FALSE;
