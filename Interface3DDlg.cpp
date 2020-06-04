@@ -1,6 +1,6 @@
 ﻿//m_bAutoDestroyBmp
 
-// Interface3DDlg.cpp : 实现文件 
+// Interface3DDlg.cpp : 实现文件 zzz
 //
 
 #include "stdafx.h"
