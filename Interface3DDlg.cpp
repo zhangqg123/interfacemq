@@ -785,8 +785,8 @@ void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_se
 
 
 	OutputDebugString(_T("[hao]: DoWork   -- start"));
-	VARIANT vtTagName,vtTagDESC;
-	VARIANT vtTagValue;
+//	VARIANT vtTagName,vtTagDESC;
+//	VARIANT vtTagValue;
 	//VariantInit(&vtTagName);
 	CString csPName;
 	
@@ -816,6 +816,9 @@ void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_se
 						
 						while(pos2 != NULL)
 						{
+							VARIANT vtTagName,vtTagDESC;
+							VARIANT vtTagValue;
+
 							if(!Jroot_M[tn].isNull())
 							{
 								Jroot_M[tn].clear();//清空 elemt
@@ -866,6 +869,7 @@ void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_se
 									dbValue = (double)pbstrPv[0].dblVal;
 								}
 					//			SysFreeString(vtTagName.bstrVal);
+								VariantClear (pbstrPv);
 								SafeArrayUnaccessData(pSafeArray);
 								SafeArrayDestroy(pSafeArray);
 
@@ -898,6 +902,7 @@ void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_se
 								OutputDebugString(csDebugValue);
 								OutputDebugString(_T("[hao]:	---------------------------4"));
 				//				SysFreeString(vtTagDESC.bstrVal);
+								VariantClear (pbstrPv);
 								SafeArrayUnaccessData(pSafeArray);
 								SafeArrayDestroy(pSafeArray);
 								OutputDebugString(_T("[hao]:	---------------------------5"));
