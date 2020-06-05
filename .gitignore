@@ -30,3 +30,5 @@ $tf*/
 *.dll
 *.sdf
 *.opensdf
+*.ipch
+ipch*/
