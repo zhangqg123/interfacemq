@@ -30,5 +30,10 @@ $tf*/
 *.dll
 *.sdf
 *.opensdf
-*.ipch
-ipch*/
+# Visual C++ cache files
+ipch/
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+*.cachefile
