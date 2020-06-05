@@ -2593,6 +2593,8 @@ void CInterface3DDlg::OnLbnSelchangeListAllNode()
 	int nCur = m_clAllNode.GetCurSel();
 	VARIANT vtName;
 	CString csPath;
+	if(nCur==-1)
+		return;
 	m_clAllNode.GetText(nCur,csPath);
 
 	CString csTmp;
@@ -2644,7 +2646,8 @@ void CInterface3DDlg::OnLbnSelchangeListCurNode()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	int nCur  = m_clCurNode.GetCurSel();
-
+	if(nCur==-1)
+		return;
 	m_clCurNode.GetText(nCur,m_csPointName);
 	int nPos = m_csPointName.Find('\\');
 	m_csPath = m_csPointName.Left(nPos);
