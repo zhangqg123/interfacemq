@@ -37,3 +37,13 @@ ipch/
 *.opensdf
 *.sdf
 *.cachefile
+*.sln
+*.db
+*.vcxproj
+*.filters
+ReadMe.txt
+stdafx.h
+stdafx.cpp
+targetver.h
+StdAfx.h
+StdAfx.cpp
