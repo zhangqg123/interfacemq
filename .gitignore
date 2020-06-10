@@ -33,9 +33,6 @@ ipch/
 *.ncb
 *.opendb
 *.opensdf
-<<<<<<< HEAD
-# Visual C++ cache files
-ipch/
 *.aps
 *.ncb
 *.opensdf
@@ -51,9 +48,7 @@ stdafx.cpp
 targetver.h
 StdAfx.h
 StdAfx.cpp
-=======
 *.sdf
 *.cachefile
 *.VC.db
 *.VC.VC.opendb
->>>>>>> 9687f1009634df1e93f636aad673fccfa6e29fe2
