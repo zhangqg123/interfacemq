@@ -1017,7 +1017,8 @@ void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_se
 
 									CString csSceneNameNoNum = pS->csName.Right(pS->csName.GetLength() - 6);
 									std::string Alarm_name( CW2A( csSceneNameNoNum.GetString() ) ); 
-									SendTextMessage("alarm_" + Alarm_name,tn,m_session,m_producer);
+							//		SendTextMessage("alarm_" + Alarm_name,tn,m_session,m_producer);
+									SendTextMessage("alarm_SDJH",tn,m_session,m_producer);
 								}
 							}
 							
