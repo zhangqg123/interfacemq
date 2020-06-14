@@ -78,7 +78,7 @@
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <OutDir>D:\QWERT-7.0</OutDir>
+    <OutDir>..\..\Program Files %28x86%29\QWERT-7.0</OutDir>
     <TargetName>InterfaceMQ</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -145,7 +145,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>F:\work\visual\mqc++\apr-util\include;F:\work\visual\mqc++\apr-iconv\include;F:\work\visual\mqc++\apr\include;F:\work\visual\mqc++\activemq-cpp-library-3.9.0\src\main;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\develop\vs\mqc++\apr-util\include;D:\develop\vs\mqc++\apr-iconv\include;D:\develop\vs\mqc++\apr\include;D:\develop\vs\mqc++\activemq-cpp-library-3.9.0\src\main;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ProgramDataBaseFileName>$(IntDir)vc$(PlatformToolsetVersion).pdb</ProgramDataBaseFileName>
     </ClCompile>
     <Link>
@@ -154,7 +154,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>libactivemq-cpp.lib;lib_json.lib;DbManager.lib;libapr-1.lib;libapriconv-1.lib;libaprutil-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>F:\work\visual\mqc++\activemq-c++;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\develop\vs\mqc++\activemq-c++;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <Version>9.0.0.1</Version>
     </Link>
