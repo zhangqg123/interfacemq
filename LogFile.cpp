@@ -92,12 +92,23 @@ UINT  AFX_CDECL WriteLogThread(LPVOID lParam)
 			logFile.WriteString(strTime);
 		}
 		
-		if(pFile->m_bFlagSend)
+/*		if(pFile->m_bFlagSend)
 		{
 			char* old_locale = _strdup( setlocale(LC_CTYPE,NULL) );
 			setlocale( LC_CTYPE, "chs");//设定
 			logFile.WriteString(pFile->m_csLog);
 			pFile->m_bFlagSend = FALSE;
+			setlocale( LC_CTYPE, old_locale );
+			free( old_locale );//还原区域设定 
+			
+		}
+*/
+		if(pFile->m_errorLog)
+		{
+			char* old_locale = _strdup( setlocale(LC_CTYPE,NULL) );
+			setlocale( LC_CTYPE, "chs");//设定
+			logFile.WriteString(pFile->m_csLog);
+			pFile->m_errorLog = FALSE;
 			setlocale( LC_CTYPE, old_locale );
 			free( old_locale );//还原区域设定 
 			

@@ -41,6 +41,8 @@ ipch/
 *.sln
 *.db
 *.vcxproj
+.vcxproj.filters
+.vcxproj.user
 *.filters
 ReadMe.txt
 stdafx.h

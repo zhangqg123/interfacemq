@@ -22,6 +22,7 @@ public:
 
 	BOOL m_bFlagAmq;
 	BOOL m_bFlagSend;
+	BOOL m_errorLog;
 public:
 	//Æô¶¯
 	BOOL Run();

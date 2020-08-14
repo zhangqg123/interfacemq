@@ -141,6 +141,7 @@ struct AlarmTagInfo
 {
 	BOOL bFlag;				//报警标志位
 	CString csTagName;	//点名
+	CString csTagDESC;	//介绍
 	BOOL bAlarmTagType;	//报警点类型. 0:模拟量. 1:数字量
 	BOOL bLimitHiFlag;	//模拟点高限值标志位
 	double dbLimitHi;		//模拟点高限值
@@ -223,6 +224,7 @@ public:
 	BOOL  m_bFlagAmq;    //amq连接
 	BOOL  m_bFlagSend;	//推送
 	BOOL  m_bFlagStop;
+	BOOL  m_errorLog;
 	CLogFile m_log;
 	int  m_nStateus;
 
@@ -253,6 +255,7 @@ public:
 	void InitActiveMQ(void);
 	void MonitorJsonString(LPVOID pS,LPVOID pB,LPVOID pF,LPVOID pR,PVOID pD,LPVOID pT,double pv,int tn);
 	void AlarmJsonString(LPVOID pS,LPVOID pB,LPVOID pF,LPVOID pR,LPVOID pD,LPVOID pT,double pv,int tn);
+	void AlarmJsonString2(CString csTagName,CString csTagDESC,double pv,int tn);
 	string CStrToStr(CString str);
 	void UpDateTree(void);
 	void SearchNode(HTREEITEM hTree);

@@ -20,6 +20,9 @@
 #include <locale>
 
 #include <DbgHelp.h>
+
+#include <windows.h>
+
 #pragma comment(lib,"Dbghelp.lib")
 //using namespace activemq::core;   
 
@@ -60,6 +63,7 @@ static int g_nStrid[21][17] = {
 	IDS_STRING173,IDS_STRING180,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
 	IDS_STRING181,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
 };
+HANDLE hMutex;
 
 class CAboutDlg : public CDialogEx
 {
@@ -188,7 +192,7 @@ CInterface3DDlg::~CInterface3DDlg()
 		}	
 	}
 
-
+	CloseHandle(hMutex);
 	try{  
 		if( m_connection != NULL) 
 		{
@@ -199,7 +203,9 @@ CInterface3DDlg::~CInterface3DDlg()
 		}
 	}
 	catch ( CMSException& e ) {
-		e.printStackTrace();
+//		e.printStackTrace();
+		m_log.m_errorLog=TRUE;
+		m_log.m_csLog=e.getMessage().c_str();
 	}  
 	  
 	
@@ -435,7 +441,9 @@ void CInterface3DDlg::InitActiveMQ(void)
 
 	}catch ( CMSException& e ) {  
 		OutputDebugString(_T("[hao]:InitActiveMQ: ----------CMSException"));
-		e.printStackTrace();  
+	//	e.printStackTrace();  
+		m_log.m_errorLog=TRUE;
+		m_log.m_csLog=e.getMessage().c_str();
 	} 
 	OutputDebugString(_T("[hao]:InitActiveMQ: ----------end"));
 }
@@ -582,6 +590,41 @@ void CInterface3DDlg::AlarmJsonString(LPVOID pS,LPVOID pB,LPVOID pF,LPVOID pR,LP
 	]
 	*/
 }
+//告警
+void CInterface3DDlg::AlarmJsonString2(CString csTagName,CString csTagDESC,double pv,int tn)
+{
+//	POINT_DB *pt = (POINT_DB *)pT;
+
+	//perf_time
+	CTime time  = CTime::GetCurrentTime();
+	CString csTime = time.Format("%Y-%m-%d %H:%M:%S");
+	CString csValue;
+	csValue.Format(_T("%lf"),pv);
+
+	Json::Value Son;
+
+	/*******************   hjq   ****************************/
+	Son["Summary"] = Json::Value(CStrToStr(csTagDESC));//数据库变量的DESC
+//	Son["SourceAlertKey"] = Json::Value(CStrToStr(pt->csType));//指标级
+//	Son["SourceSeverity"] = Json::Value(CStrToStr(pt->csOriAlarmLevel));
+//	Son["SourceIdentifier"] = Json::Value(CStrToStr(pt->csCompress));
+	Son["SourceEventID"] = Json::Value(CStrToStr(csTagName));//数据库点名
+//	Son["Severity"] = Json::Value(CStrToStr(pt->csAlarmLevel));
+	Son["LastOccurrence"] = Json::Value(CStrToStr(csTime));	//时间
+//	Son["SourceCIName"] = Json::Value(CStrToStr(pt->csIODeviceName));
+	Son["Status"] = Json::Value(CStrToStr(csValue));	//PV值
+//	Son["SourceID"] = Json::Value(CStrToStr(pt->csSourceID));
+
+	if (m_bSendAlarm)
+	{
+		Jroot_A[tn][""].append(Son);
+//		pt->nState = pv;
+	}
+	else
+	{
+		Jroot_A[tn].clear();
+	}
+}
 
 //监控
 void CInterface3DDlg::MonitorJsonString(LPVOID pS,LPVOID pB,LPVOID pF,LPVOID pR,LPVOID pD,LPVOID pT,double pv,int tn)
@@ -681,6 +724,7 @@ string  CInterface3DDlg::UnicodetoUTF_8(string &pstrOut)
 	delete [] pszStr;
 	return strUTF;
 }
+
 void CInterface3DDlg::SendTextMessage(string StrQueue,int tn,Session* m_session, MessageProducer* m_producer)
 {
 //	Session  * m_session;	//DDian
@@ -759,7 +803,11 @@ void CInterface3DDlg::SendTextMessage(string StrQueue,int tn,Session* m_session,
 	}
 	catch (CException* e)
 	{
-		
+		m_log.m_errorLog=TRUE;
+		TCHAR szError[1024];
+		e->GetErrorMessage(szError,1024);
+		m_log.m_csLog=szError;
+		e->Delete();
 	}
 
 /*	if(m_session)	//DDian
@@ -779,264 +827,393 @@ void CInterface3DDlg::SendTextMessage(string StrQueue,int tn,Session* m_session,
 	}
 */	
 }
-
 void CInterface3DDlg::DoWork(Scene_para* pS,int tn,string StrQueue,Session* m_session,MessageProducer* m_producer)
 {
+	double dbValue = 0;
+
+	if(tn==m_threadNumber-1 && m_AlarmTagInfoList.GetCount()>0){
+		//报警
+		POSITION pos1,pos2;
+		CString csTagNameTmp;
+		CString csDebugValue;
+		
+/*								for (pos1 = m_cslistTagName.GetHeadPosition(); ( pos2 = pos1 ) != NULL;  )
+								{
+							
+									OutputDebugString(_T("[hao]:	---------------------------7"));
+									csTagNameTmp = m_cslistTagName.GetNext(pos1); 
 
 
-	OutputDebugString(_T("[hao]: DoWork   -- start"));
-//	VARIANT vtTagName,vtTagDESC;
-//	VARIANT vtTagValue;
-	//VariantInit(&vtTagName);
-	CString csPName;
-	
-	POSITION  pos = m_pSceneList.GetHeadPosition();
+										csDebugValue.Format(_T("[hao]:	检测到有报警产生 start"));
+										m_bSendAlarm = TRUE;
+										m_cslistTagName.RemoveAt(pos2);
+										if (m_nTagType == 0)	//模拟点报警发送1
+										{
+											dbValue = 1;
+										}
+										csDebugValue.Format(_T("[hao]:	检测到有报警产生 end"));
 
-	if(pos != NULL)
-	{
-		POSITION posBuild = pS->pBuildList.GetHeadPosition();
-
-		while(posBuild != NULL)
+								}
+								OutputDebugString(_T("[hao]:	---------------------------8"));
+*/
+		//
+		AlarmTagInfo AlarmTagInfoStruct;
+		for (pos1 = m_AlarmTagInfoList.GetHeadPosition(); ( pos2 = pos1 ) != NULL;  )
 		{
-			Build_para *pB= (Build_para *)pS->pBuildList.GetNext(posBuild);
-			POSITION posFloor = pB->pFloorList.GetHeadPosition();
-			while(posFloor != NULL)
+			if (!Jroot_A[tn].isNull())
 			{
-				Floor_para *pFloor= (Floor_para *)pB->pFloorList.GetNext(posFloor);
-				POSITION posRoom = pFloor->pRoomList.GetHeadPosition();
-				while(posRoom != NULL)
+				Jroot_A[tn].clear();//清空 elemt
+			}
+			dbValue = 1;
+			AlarmTagInfoStruct = m_AlarmTagInfoList.GetNext(pos1); 
+			BOOL delflag=false;
+			VARIANT vtTagDESC,vtTagValue;
+			vtTagDESC.vt = VT_BSTR;
+			CString csParDESC = AlarmTagInfoStruct.csTagName + _T(".DESC");
+			vtTagDESC.bstrVal = csParDESC.AllocSysString();
+			vtTagValue = m_dbCom.GetData(vtTagDESC);
+			if (vtTagValue.vt != VT_NULL && vtTagValue.vt != VT_EMPTY)
+			{
+				OutputDebugString(_T("[hao]:	---------------------------3"));
+				SAFEARRAY* pSafeArray2 = vtTagValue.parray;
+				VARIANT HUGEP* pbstrPv;
+				SafeArrayAccessData(pSafeArray2, (void HUGEP*FAR*)&pbstrPv);
+				CString csTagDESC;
+				if (pbstrPv[0].vt == VT_BSTR)
 				{
-					Room_para *pRoom = (Room_para *)pFloor->pRoomList.GetNext(posRoom);
-					POSITION posDevice = pRoom->pDeviceList.GetHeadPosition();
-					while(posDevice != NULL)
+					csTagDESC = pbstrPv[0].bstrVal;     //监控数据
+				}			
+				AlarmTagInfoStruct.csTagDESC=csTagDESC;
+				csDebugValue.Format(_T("[hao]:DESC： %s"),csTagDESC);
+				OutputDebugString(csDebugValue);
+				OutputDebugString(_T("[hao]:	---------------------------4"));
+//				SysFreeString(vtTagDESC.bstrVal);
+				VariantClear (pbstrPv);
+				SafeArrayUnaccessData(pSafeArray2);
+				SafeArrayDestroy(pSafeArray2);
+				OutputDebugString(_T("[hao]:	---------------------------5"));
+			}
+			SysFreeString(vtTagDESC.bstrVal);
+
+			if (AlarmTagInfoStruct.bFlag == 1)
+			{
+				m_bSendAlarm = TRUE;
+				if (AlarmTagInfoStruct.bAlarmTagType == 0)	//模拟点
+				{
+					dbValue = 1;
+
+					if (AlarmTagInfoStruct.bLimitHiFlag == 1 && AlarmTagInfoStruct.bLimitLoFlag == 0)		//高报
 					{
-						Device *pPd= (Device *)pRoom->pDeviceList.GetNext(posDevice);
-						POSITION pos2 = pPd->pPointList.GetHeadPosition();	
-						Json::Value root;
-						
-						while(pos2 != NULL)
+						if (AlarmTagInfoStruct.dbLimitHi >  AlarmTagInfoStruct.dbValue)
 						{
-							VARIANT vtTagName,vtTagDESC;
-							VARIANT vtTagValue;
-
-							if(!Jroot_M[tn].isNull())
-							{
-								Jroot_M[tn].clear();//清空 elemt
-							}
-							if (!Jroot_A[tn].isNull())
-							{
-								Jroot_A[tn].clear();//清空 elemt
-							}
-
-							double dbValue = 0;
-							Point_DB  *pPt= (Point_DB *)pPd->pPointList.GetNext(pos2);
-							vtTagName.vt = VT_BSTR;
-							CString csTagName;//长点名
-							//CString csPV =  pPt->csPath +_T("\\") + pPt->csName;
-
-							//节约内存，提升速度
-							CString csPV = pPt->csPath;
-							csPV += _T("\\");
-							csPV += pPt->csName;
-							pPt->csLongTagName = csPV;
-
-							CString csDebugValue;
-							csDebugValue.Format(_T("[hao]:	DB点名： %s"),csPV);
-							OutputDebugString(csDebugValue);
-							
-							vtTagName.bstrVal = csPV.AllocSysString();
-							
-							vtTagValue = m_dbCom.GetData(vtTagName);
-							
-							//点类型 0 模拟点  1 数字点
-							m_nTagType = m_dbCom.GetTagType(&vtTagName.bstrVal);
-							
-							
-							//PV
-							if (vtTagValue.vt != VT_NULL && vtTagValue.vt != VT_EMPTY)
-							{
-								SAFEARRAY* pSafeArray = vtTagValue.parray;
-
-								VARIANT HUGEP* pbstrPv;
-								//VariantInit(pbstrPv);
-								SafeArrayAccessData(pSafeArray, (void HUGEP*FAR*)&pbstrPv);
-								if (pbstrPv[0].vt == VT_R8)
-								{
-									dbValue = pbstrPv[0].dblVal;     //监控数据
-								}
-								else if(pbstrPv[0].vt == VT_I4)
-								{
-									dbValue = (double)pbstrPv[0].dblVal;
-								}
-					//			SysFreeString(vtTagName.bstrVal);
-								VariantClear (pbstrPv);
-								SafeArrayUnaccessData(pSafeArray);
-								SafeArrayDestroy(pSafeArray);
-
-								csDebugValue.Format(_T("[hao]:	DB数值： %.4f"),dbValue);
-								OutputDebugString(csDebugValue);
-							}
-							SysFreeString(vtTagName.bstrVal);
-//							VariantClear (&vtTagName);
-
-							OutputDebugString(_T("[hao]:	---------------------------1"));
-							//获取报警点DESC
-							vtTagDESC.vt = VT_BSTR;
-							pPt->csParDESC = csPV + _T(".DESC");
-							vtTagDESC.bstrVal = pPt->csParDESC.AllocSysString();
-							vtTagValue = m_dbCom.GetData(vtTagDESC);
-							csDebugValue.Format(_T("[hao]:pPt->csParDESC： m_dbCom.GetData(%s)"),pPt->csParDESC);
-							OutputDebugString(csDebugValue);
-							OutputDebugString(_T("[hao]:	---------------------------2"));
-							if (vtTagValue.vt != VT_NULL && vtTagValue.vt != VT_EMPTY)
-							{
-								OutputDebugString(_T("[hao]:	---------------------------3"));
-								SAFEARRAY* pSafeArray = vtTagValue.parray;
-								VARIANT HUGEP* pbstrPv;
-								SafeArrayAccessData(pSafeArray, (void HUGEP*FAR*)&pbstrPv);
-								if (pbstrPv[0].vt == VT_BSTR)
-								{
-									pPt->csTagDESC = pbstrPv[0].bstrVal;     //监控数据
-								}			
-								csDebugValue.Format(_T("[hao]:DESC： %s"),pPt->csTagDESC);
-								OutputDebugString(csDebugValue);
-								OutputDebugString(_T("[hao]:	---------------------------4"));
-				//				SysFreeString(vtTagDESC.bstrVal);
-								VariantClear (pbstrPv);
-								SafeArrayUnaccessData(pSafeArray);
-								SafeArrayDestroy(pSafeArray);
-								OutputDebugString(_T("[hao]:	---------------------------5"));
-							}
-							SysFreeString(vtTagDESC.bstrVal);
-//							VariantClear (&vtTagDESC);
-//							VariantClear (&vtTagValue);
-
-							OutputDebugString(_T("[hao]:	---------------------------6"));
-							m_bSendAlarm = FALSE;
-							
-							//报警
-							
-							POSITION pos1,pos2;
-							CString csTagNameTmp;
-							for (pos1 = m_cslistTagName.GetHeadPosition(); ( pos2 = pos1 ) != NULL;  )
-							{
-								OutputDebugString(_T("[hao]:	---------------------------7"));
-								csTagNameTmp = m_cslistTagName.GetNext(pos1); 
-								csDebugValue.Format(_T("[hao]: csTagNameTmp:%s "),csTagNameTmp);
-								OutputDebugString(csDebugValue);
-								csDebugValue.Format(_T("[hao]: csPV:%s "),csPV);
-								OutputDebugString(csDebugValue);
-								if (csTagNameTmp == csPV)
-								{
-									csDebugValue.Format(_T("[hao]:	检测到有报警产生 start"));
-									m_bSendAlarm = TRUE;
-									m_cslistTagName.RemoveAt(pos2);
-									if (m_nTagType == 0)	//模拟点报警发送1
-									{
-										dbValue = 1;
-									}
-									csDebugValue.Format(_T("[hao]:	检测到有报警产生 end"));
-								}
-							}
-							OutputDebugString(_T("[hao]:	---------------------------8"));
-							//恢复
-							AlarmTagInfo AlarmTagInfoStruct;
-							for (pos1 = m_AlarmTagInfoList.GetHeadPosition(); ( pos2 = pos1 ) != NULL;  )
-							{
-								AlarmTagInfoStruct = m_AlarmTagInfoList.GetNext(pos1); 
-								if (AlarmTagInfoStruct.csTagName == csPV)
-								{
-									if (AlarmTagInfoStruct.bFlag == 1)
-									{
-										if (AlarmTagInfoStruct.bAlarmTagType == 0)	//模拟点
-										{
-											if (AlarmTagInfoStruct.bLimitHiFlag == 1 && AlarmTagInfoStruct.bLimitLoFlag == 0)		//高报
-											{
-												if (AlarmTagInfoStruct.dbLimitHi >  dbValue)
-												{
-													m_bSendAlarm = TRUE;
-													m_AlarmTagInfoList.RemoveAt(pos2);
-													dbValue = 2;
-												}
-											}
-											if (AlarmTagInfoStruct.bLimitHiFlag == 0 && AlarmTagInfoStruct.bLimitLoFlag == 1)		//低报
-											{
-												if (AlarmTagInfoStruct.dbLimiLo <  dbValue)
-												{
-													m_bSendAlarm = TRUE;
-													m_AlarmTagInfoList.RemoveAt(pos2);
-													dbValue = 2;
-												}
-											}
-										}
-										else if (AlarmTagInfoStruct.bAlarmTagType == 1)	//数字点
-										{
-											if (AlarmTagInfoStruct.bDigType == 0)	//关闭->打开
-											{
+//							m_bSendAlarm = TRUE;
+							dbValue = 2;
+						}
+					}
+					if (AlarmTagInfoStruct.bLimitHiFlag == 0 && AlarmTagInfoStruct.bLimitLoFlag == 1)		//低报
+					{
+						if (AlarmTagInfoStruct.dbLimiLo < AlarmTagInfoStruct.dbValue)
+						{
+//							m_bSendAlarm = TRUE;
+							dbValue = 2;
+						}
+					}
+				}
+				else if (AlarmTagInfoStruct.bAlarmTagType == 1)	//数字点
+				{
+					if (AlarmTagInfoStruct.bDigType == 0)	//关闭->打开
+					{
 												
-												if ((fabs(dbValue - 0) < (1E-15)))
-												{
-													m_bSendAlarm = TRUE;
-													m_AlarmTagInfoList.RemoveAt(pos2);
-													dbValue = 2;
-												}
-											}
-											if (AlarmTagInfoStruct.bDigType == 1)	//打开->关闭
-											{
-												if ((fabs(dbValue - 1) < (1E-15)))
-												{
-													m_bSendAlarm = TRUE;
-													m_AlarmTagInfoList.RemoveAt(pos2);
-													dbValue = 2;
-												}
-											}
-										}
-									}	
-								}
-							}
+						if ((fabs(AlarmTagInfoStruct.dbValue - 0) < (1E-15)))
+						{
+//							m_bSendAlarm = TRUE;
+							dbValue = 2;
+						}
+					}
+					if (AlarmTagInfoStruct.bDigType == 1)	//打开->关闭
+					{
+						if ((fabs(AlarmTagInfoStruct.dbValue - 1) < (1E-15)))
+						{
+//							m_bSendAlarm = TRUE;
+							dbValue = 2;
+						}
+					}
+				}
+			}	
+			WaitForSingleObject(hMutex, INFINITE);
+			m_AlarmTagInfoList.RemoveAt(pos2);
+			ReleaseMutex(hMutex);
+//			if(!AlarmTagInfoStruct.csTagDESC.IsEmpty()){
+//				break;
+//			}
+		}
+//		WaitForSingleObject(hMutex, INFINITE);
+//		m_AlarmTagInfoList.RemoveAll();
+//		ReleaseMutex(hMutex);
 
-							
-							OutputDebugString(_T("[hao]:	---------------------------9"));
-							if(pPt->csPointType == _T("监控"))
+		AlarmJsonString2(AlarmTagInfoStruct.csTagName,AlarmTagInfoStruct.csTagDESC,dbValue,tn);			
+		if(!Jroot_A[tn].isNull() && m_bSendAlarm)
+		{
+			SendTextMessage("alarm_SDJH",tn,m_session,m_producer);
+		}
+	}else{
+		OutputDebugString(_T("[hao]: DoWork   -- start"));
+	//	VARIANT vtTagName,vtTagDESC;
+	//	VARIANT vtTagValue;
+		//VariantInit(&vtTagName);
+		CString csPName;
+	
+		POSITION  pos = m_pSceneList.GetHeadPosition();
+
+		if(pos != NULL)
+		{
+			POSITION posBuild = pS->pBuildList.GetHeadPosition();
+
+			while(posBuild != NULL)
+			{
+				Build_para *pB= (Build_para *)pS->pBuildList.GetNext(posBuild);
+				POSITION posFloor = pB->pFloorList.GetHeadPosition();
+				while(posFloor != NULL)
+				{
+					Floor_para *pFloor= (Floor_para *)pB->pFloorList.GetNext(posFloor);
+					POSITION posRoom = pFloor->pRoomList.GetHeadPosition();
+					while(posRoom != NULL)
+					{
+						Room_para *pRoom = (Room_para *)pFloor->pRoomList.GetNext(posRoom);
+						POSITION posDevice = pRoom->pDeviceList.GetHeadPosition();
+						while(posDevice != NULL)
+						{
+							Device *pPd= (Device *)pRoom->pDeviceList.GetNext(posDevice);
+							POSITION pos2 = pPd->pPointList.GetHeadPosition();	
+							Json::Value root;
+						
+							while(pos2 != NULL)
 							{
-								MonitorJsonString(pS,pB,pFloor,pRoom,pPd,pPt,dbValue,tn);
+								VARIANT vtTagName,vtTagDESC;
+								VARIANT vtTagValue,vtTagDESCValue;
+
 								if(!Jroot_M[tn].isNull())
 								{
-									csDebugValue.Format(_T("[hao]:	监控   DB点名： %s"),csPV);
-									OutputDebugString(csDebugValue);
-									SendTextMessage(StrQueue,tn,m_session,m_producer);
+									Jroot_M[tn].clear();//清空 elemt
 								}
-							}
-							else 
-							{	
-								AlarmJsonString(pS,pB,pFloor,pRoom,pPd,pPt,dbValue,tn);
-								if(!Jroot_A[tn].isNull() && m_bSendAlarm)
+//								if (!Jroot_A[tn].isNull())
+//								{
+//									Jroot_A[tn].clear();//清空 elemt
+//								}
+
+								Point_DB  *pPt= (Point_DB *)pPd->pPointList.GetNext(pos2);
+								vtTagName.vt = VT_BSTR;
+								CString csTagName;//长点名
+								//CString csPV =  pPt->csPath +_T("\\") + pPt->csName;
+
+								//节约内存，提升速度
+								CString csPV = pPt->csPath;
+								csPV += _T("\\");
+								csPV += pPt->csName;
+								pPt->csLongTagName = csPV;
+
+								CString csDebugValue;
+								csDebugValue.Format(_T("[hao]:	DB点名： %s"),csPV);
+								OutputDebugString(csDebugValue);
+							
+								vtTagName.bstrVal = csPV.AllocSysString();
+							
+								vtTagValue = m_dbCom.GetData(vtTagName);
+							
+								//点类型 0 模拟点  1 数字点
+								m_nTagType = m_dbCom.GetTagType(&vtTagName.bstrVal);
+							
+							
+								//PV
+								if (vtTagValue.vt != VT_NULL && vtTagValue.vt != VT_EMPTY)
 								{
-									csDebugValue.Format(_T("[hao]:	告警   DB点名： %s"),csPV);
+									SAFEARRAY* pSafeArray = vtTagValue.parray;
+
+									VARIANT HUGEP* pbstrPv;
+									//VariantInit(pbstrPv);
+									SafeArrayAccessData(pSafeArray, (void HUGEP*FAR*)&pbstrPv);
+									if (pbstrPv[0].vt == VT_R8)
+									{
+										dbValue = pbstrPv[0].dblVal;     //监控数据
+									}
+									else if(pbstrPv[0].vt == VT_I4)
+									{
+										dbValue = (double)pbstrPv[0].dblVal;
+									}
+						//			SysFreeString(vtTagName.bstrVal);
+									VariantClear (pbstrPv);
+									SafeArrayUnaccessData(pSafeArray);
+									SafeArrayDestroy(pSafeArray);
+
+									csDebugValue.Format(_T("[hao]:	DB数值： %.4f"),dbValue);
 									OutputDebugString(csDebugValue);
-
-									CString csSceneNameNoNum = pS->csName.Right(pS->csName.GetLength() - 6);
-									std::string Alarm_name( CW2A( csSceneNameNoNum.GetString() ) ); 
-							//		SendTextMessage("alarm_" + Alarm_name,tn,m_session,m_producer);
-									SendTextMessage("alarm_SDJH",tn,m_session,m_producer);
 								}
-							}
-							
-							Sleep(5);
-							OutputDebugString(_T("[hao]:	---------------------------10"));
-							
-						}
-						
-						OutputDebugString(_T("[hao]:	1111111111111111"));
-					}
-					OutputDebugString(_T("[hao]:	22222222222222222"));
-				}
-				OutputDebugString(_T("[hao]:	33333333333333333"));
-			}
-			OutputDebugString(_T("[hao]:	44444444444444444"));
-		}
+								SysFreeString(vtTagName.bstrVal);
+	//							VariantClear (&vtTagName);
+								VariantClear (&vtTagValue);
 
-		OutputDebugString(_T("[hao]:	55555555555555555"));
+								OutputDebugString(_T("[hao]:	---------------------------1"));
+								//获取报警点DESC
+								vtTagDESC.vt = VT_BSTR;
+								pPt->csParDESC = csPV + _T(".DESC");
+								vtTagDESC.bstrVal = pPt->csParDESC.AllocSysString();
+								vtTagDESCValue = m_dbCom.GetData(vtTagDESC);
+
+								if (vtTagDESCValue.vt != VT_NULL && vtTagDESCValue.vt != VT_EMPTY)
+								{
+									OutputDebugString(_T("[hao]:	---------------------------3"));
+									SAFEARRAY* pSafeArray = vtTagDESCValue.parray;
+									VARIANT HUGEP* pbstrPv;
+									SafeArrayAccessData(pSafeArray, (void HUGEP*FAR*)&pbstrPv);
+									if (pbstrPv[0].vt == VT_BSTR)
+									{
+										pPt->csTagDESC = pbstrPv[0].bstrVal;     //监控数据
+									}			
+									csDebugValue.Format(_T("[hao]:DESC： %s"),pPt->csTagDESC);
+									OutputDebugString(csDebugValue);
+									OutputDebugString(_T("[hao]:	---------------------------4"));
+					//				SysFreeString(vtTagDESC.bstrVal);
+									VariantClear (pbstrPv);
+									SafeArrayUnaccessData(pSafeArray);
+									SafeArrayDestroy(pSafeArray);
+									OutputDebugString(_T("[hao]:	---------------------------5"));
+								}
+								SysFreeString(vtTagDESC.bstrVal);
+	//							VariantClear (&vtTagDESC);
+								VariantClear (&vtTagDESCValue);
+
+								OutputDebugString(_T("[hao]:	---------------------------6"));
+								m_bSendAlarm = FALSE;
+							
+	/*
+								//报警
+								POSITION pos1,pos2;
+								CString csTagNameTmp;
+
+								for (pos1 = m_cslistTagName.GetHeadPosition(); ( pos2 = pos1 ) != NULL;  )
+								{
+							
+									OutputDebugString(_T("[hao]:	---------------------------7"));
+									csTagNameTmp = m_cslistTagName.GetNext(pos1); 
+						//			if(!csTagNameTmp.IsEmpty()){
+										csDebugValue.Format(_T("[hao]: csTagNameTmp:%s "),csTagNameTmp);
+										OutputDebugString(csDebugValue);
+										csDebugValue.Format(_T("[hao]: csPV:%s "),csPV);
+										OutputDebugString(csDebugValue);
+						//			} 
+									if (csTagNameTmp == csPV)
+									{
+										csDebugValue.Format(_T("[hao]:	检测到有报警产生 start"));
+										m_bSendAlarm = TRUE;
+										m_cslistTagName.RemoveAt(pos2);
+										if (m_nTagType == 0)	//模拟点报警发送1
+										{
+											dbValue = 1;
+										}
+										csDebugValue.Format(_T("[hao]:	检测到有报警产生 end"));
+									}
+								}
+								OutputDebugString(_T("[hao]:	---------------------------8"));
+								//恢复
+								AlarmTagInfo AlarmTagInfoStruct;
+								for (pos1 = m_AlarmTagInfoList.GetHeadPosition(); ( pos2 = pos1 ) != NULL;  )
+								{
+									AlarmTagInfoStruct = m_AlarmTagInfoList.GetNext(pos1); 
+									if (AlarmTagInfoStruct.csTagName == csPV)
+									{
+										if (AlarmTagInfoStruct.bFlag == 1)
+										{
+											if (AlarmTagInfoStruct.bAlarmTagType == 0)	//模拟点
+											{
+												if (AlarmTagInfoStruct.bLimitHiFlag == 1 && AlarmTagInfoStruct.bLimitLoFlag == 0)		//高报
+												{
+													if (AlarmTagInfoStruct.dbLimitHi >  dbValue)
+													{
+														m_bSendAlarm = TRUE;
+														m_AlarmTagInfoList.RemoveAt(pos2);
+														dbValue = 2;
+													}
+												}
+												if (AlarmTagInfoStruct.bLimitHiFlag == 0 && AlarmTagInfoStruct.bLimitLoFlag == 1)		//低报
+												{
+													if (AlarmTagInfoStruct.dbLimiLo <  dbValue)
+													{
+														m_bSendAlarm = TRUE;
+														m_AlarmTagInfoList.RemoveAt(pos2);
+														dbValue = 2;
+													}
+												}
+											}
+											else if (AlarmTagInfoStruct.bAlarmTagType == 1)	//数字点
+											{
+												if (AlarmTagInfoStruct.bDigType == 0)	//关闭->打开
+												{
+												
+													if ((fabs(dbValue - 0) < (1E-15)))
+													{
+														m_bSendAlarm = TRUE;
+														m_AlarmTagInfoList.RemoveAt(pos2);
+														dbValue = 2;
+													}
+												}
+												if (AlarmTagInfoStruct.bDigType == 1)	//打开->关闭
+												{
+													if ((fabs(dbValue - 1) < (1E-15)))
+													{
+														m_bSendAlarm = TRUE;
+														m_AlarmTagInfoList.RemoveAt(pos2);
+														dbValue = 2;
+													}
+												}
+											}
+										}	
+									}
+								}
+
+		*/						
+								OutputDebugString(_T("[hao]:	---------------------------9"));
+								if(pPt->csPointType == _T("监控"))
+								{
+									MonitorJsonString(pS,pB,pFloor,pRoom,pPd,pPt,dbValue,tn);
+									if(!Jroot_M[tn].isNull())
+									{
+										csDebugValue.Format(_T("[hao]:	监控   DB点名： %s"),csPV);
+										OutputDebugString(csDebugValue);
+										SendTextMessage(StrQueue,tn,m_session,m_producer);
+									}
+								}
+	/*
+								else 
+								{	
+									AlarmJsonString(pS,pB,pFloor,pRoom,pPd,pPt,dbValue,tn);
+									if(!Jroot_A[tn].isNull() && m_bSendAlarm)
+									{
+										csDebugValue.Format(_T("[hao]:	告警   DB点名： %s"),csPV);
+										OutputDebugString(csDebugValue);
+
+										CString csSceneNameNoNum = pS->csName.Right(pS->csName.GetLength() - 6);
+										std::string Alarm_name( CW2A( csSceneNameNoNum.GetString() ) ); 
+								//		SendTextMessage("alarm_" + Alarm_name,tn,m_session,m_producer);
+										SendTextMessage("alarm_SDJH",tn,m_session,m_producer);
+									}
+								}
+	*/							
+								Sleep(5);
+								OutputDebugString(_T("[hao]:	---------------------------10"));
+							
+							}
+						
+							OutputDebugString(_T("[hao]:	1111111111111111"));
+						}
+						OutputDebugString(_T("[hao]:	22222222222222222"));
+					}
+					OutputDebugString(_T("[hao]:	33333333333333333"));
+				}
+				OutputDebugString(_T("[hao]:	44444444444444444"));
+			}
+
+			OutputDebugString(_T("[hao]:	55555555555555555"));
+		}
 	}
 	Sleep(m_nTime);	
 	OutputDebugString(_T("[hao]: DoWork   -- end"));
@@ -1074,6 +1251,9 @@ UINT __cdecl ThreadPro(LPVOID args)
 	CString csSceneNameNoNum = pS->csName.Right(pS->csName.GetLength() - 6);
 	std::string Scene_name( CW2A( csSceneNameNoNum.GetString() ) ); 
 	string StrQueue="project_" + Scene_name;
+//	if(tn==pDlg->m_pSceneList.GetCount()){
+//		StrQueue="alarm_SDJH";
+//	}
 	Session  * m_session;	//DDian
 	Destination *m_destination;
 	MessageProducer * m_producer;
@@ -1137,13 +1317,18 @@ void CInterface3DDlg::ThreadBegin(void)
 	UpDateItem();
 	
 	this->m_log.m_bFlagAmq = FALSE;
+	this->m_log.m_errorLog = FALSE;
 	this->m_log.Run();
 	OutputDebugString(_T("[hao]:InitActiveMQ start"));
 	this->InitActiveMQ();
 	OutputDebugString(_T("[hao]:InitActiveMQ end"));
 	this->m_log.m_bFlagAmq = TRUE;
 	Scene_para *pS;
+	m_threadNumber=m_pSceneList.GetCount()+1;
 	int i=0;
+
+	hMutex = CreateMutex(NULL, FALSE, NULL);
+
 	for(POSITION pos = m_pSceneList.GetHeadPosition(); pos != NULL; i++)
 	{
 		pS = (Scene_para *)m_pSceneList.GetNext(pos);
@@ -1154,7 +1339,8 @@ void CInterface3DDlg::ThreadBegin(void)
 		}
 
 	}
-	m_threadNumber=i;
+	m_trPara.pThre[i] = AfxBeginThread(ThreadPro,(LPVOID)this,THREAD_PRIORITY_NORMAL,0,CREATE_SUSPENDED,0);
+//	m_threadNumber=m_pSceneList.GetCount()+1;
 
 }
 
@@ -2814,6 +3000,10 @@ void CInterface3DDlg::OnBnClickedButton2()
 //			int len = sizeof(m_trPara.pThre) / sizeof(m_trPara.pThre[0]);
 			for(int i = 0;i < m_threadNumber; i++){
 				if(m_trPara.pThre[i]){
+					if(hMutex){
+						ReleaseMutex(hMutex);
+					}
+					
 					m_trPara.pThre[i]->SuspendThread();
 				}else{
 					break;
@@ -3125,7 +3315,7 @@ void CInterface3DDlg::OnClose()
 */
 		}
 	}
-
+	CloseHandle(hMutex);
 	try{  
 		if( m_connection != NULL) 
 		{
@@ -3134,7 +3324,10 @@ void CInterface3DDlg::OnClose()
 		}
 	}
 	catch ( CMSException& e ) {
-		e.printStackTrace();
+//		e.printStackTrace();
+		m_log.m_errorLog=TRUE;
+		m_log.m_csLog=e.getMessage().c_str();
+
 	}  
 
 	m_connection = NULL;  														      
@@ -3372,22 +3565,29 @@ void CInterface3DDlg::UpDateFile()
 void CInterface3DDlg::AlarmChangeDbcommocxctrlfc71(BOOL bInit, long lAlarmCount, const VARIANT& AlarmData)
 {
 	CString csDebug;
+	CString csTagNameTmp;
+	BOOL m_bSendAlarm2=FALSE;
 	csDebug.Format(_T("[hao]:	AlarmChangeDbcommocxctrlfc71   -- start"));
 	if (AlarmData.vt != VT_NULL && AlarmData.vt != VT_EMPTY)
 	{
 		csDebug.Format(_T("[hao]:AlarmData.vt != VT_NULL && AlarmData.vt != VT_EMPTY"));
-		CString csTagNameTmp,csTagStatus,csAlarmType,csAlarmStatus;
-		double dbTagValue,dbLimitValue;
+		CString csTagStatus,csAlarmType,csAlarmStatus,csDebugValue;
+		double dbTagValue,dbLimitValue,dbValue = 0;
 		int nTagNameIndex;
 		long UBOUND;
 		SAFEARRAY* pSafeArray= AlarmData.parray;
 		VARIANT HUGEP* pbstrAla;
-		VARIANT vtTagName;
+//		VARIANT vtTagName;
+//		VARIANT vtTagDESC,vtTagValue;
+
 		SafeArrayAccessData(pSafeArray, (void HUGEP*FAR*)&pbstrAla);
 		HRESULT  lRet;
 		lRet = SafeArrayGetUBound(pSafeArray,1,&UBOUND);
 		for(int i = 0;i <= UBOUND;i++)
 		{
+			BOOL insertAllow=FALSE;
+			VARIANT vtTagName;
+
 			nTagNameIndex = 11 * (UBOUND + 1) + i;	//点数值
 			if(pbstrAla[nTagNameIndex].vt == VT_R4)
 				dbTagValue = pbstrAla[nTagNameIndex].fltVal;
@@ -3413,7 +3613,34 @@ void CInterface3DDlg::AlarmChangeDbcommocxctrlfc71(BOOL bInit, long lAlarmCount,
 			{
 				csAlarmType = pbstrAla[nTagNameIndex].bstrVal;		
 			}
-
+/*			VARIANT vtTagDESC,vtTagValue;
+			vtTagDESC.vt = VT_BSTR;
+			CString csParDESC = csTagNameTmp + _T(".DESC");
+			vtTagDESC.bstrVal = csParDESC.AllocSysString();
+			vtTagValue = m_dbCom.GetData(vtTagDESC);
+			if (vtTagValue.vt != VT_NULL && vtTagValue.vt != VT_EMPTY)
+			{
+				OutputDebugString(_T("[hao]:	---------------------------3"));
+				SAFEARRAY* pSafeArray2 = vtTagValue.parray;
+				VARIANT HUGEP* pbstrPv;
+				SafeArrayAccessData(pSafeArray2, (void HUGEP*FAR*)&pbstrPv);
+				CString csTagDESC;
+				if (pbstrPv[0].vt == VT_BSTR)
+				{
+					csTagDESC = pbstrPv[0].bstrVal;     //监控数据
+				}			
+				m_AlarmTagInfo.csTagDESC=csTagDESC;
+				csDebugValue.Format(_T("[hao]:DESC： %s"),csTagDESC);
+				OutputDebugString(csDebugValue);
+				OutputDebugString(_T("[hao]:	---------------------------4"));
+//				SysFreeString(vtTagDESC.bstrVal);
+				VariantClear (pbstrPv);
+				SafeArrayUnaccessData(pSafeArray2);
+				SafeArrayDestroy(pSafeArray2);
+				OutputDebugString(_T("[hao]:	---------------------------5"));
+			}
+			SysFreeString(vtTagDESC.bstrVal);
+*/
 			m_AlarmTagInfo.csTagName = csTagNameTmp;															//报警点点名
 			vtTagName.bstrVal = csTagNameTmp.AllocSysString();
 			m_AlarmTagInfo.bAlarmTagType = (BOOL)m_dbCom.GetTagType(&vtTagName.bstrVal);	//报警点类型
@@ -3426,7 +3653,7 @@ void CInterface3DDlg::AlarmChangeDbcommocxctrlfc71(BOOL bInit, long lAlarmCount,
 				{
 					if(dbTagValue >= dbLimitValue)
 					{
-						m_cslistTagName.AddTail(csTagNameTmp);
+//						m_cslistTagName.AddTail(csTagNameTmp);
 
 						m_AlarmTagInfo.bFlag = 1;							//报警标志位
 						m_AlarmTagInfo.bLimitHiFlag = 1;				//模拟点高限值标志位
@@ -3435,14 +3662,15 @@ void CInterface3DDlg::AlarmChangeDbcommocxctrlfc71(BOOL bInit, long lAlarmCount,
 						m_AlarmTagInfo.dbLimiLo	=	0;					//模拟点高限值
 						m_AlarmTagInfo.dbValue	= dbTagValue;		//模拟点报警值
 						m_AlarmTagInfo.bDigType = 0;					//数字点类型
-						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
+						insertAllow=TRUE;
+//						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
 					}
 				}
 				if(csTagStatus == _T("低报") || csTagStatus == _T("低低报") || csTagStatus == _T("低3报") || csTagStatus == _T("低4报") || csTagStatus == _T("低5报"))
 				{
 					if(dbTagValue <= dbLimitValue)
 					{
-						m_cslistTagName.AddTail(csTagNameTmp);
+//						m_cslistTagName.AddTail(csTagNameTmp);
 
 						m_AlarmTagInfo.bFlag = 1;							//报警标志位
 						m_AlarmTagInfo.bLimitHiFlag = 0;				//模拟点高限值标志位
@@ -3451,14 +3679,16 @@ void CInterface3DDlg::AlarmChangeDbcommocxctrlfc71(BOOL bInit, long lAlarmCount,
 						m_AlarmTagInfo.dbLimiLo	=	dbLimitValue;	//模拟点高限值
 						m_AlarmTagInfo.dbValue	= dbTagValue;		//模拟点报警值
 						m_AlarmTagInfo.bDigType = 0;					//数字点类型
-						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
+						insertAllow=TRUE;
+
+//						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
 					}
 				}
 				if(csTagStatus == _T("开关量报警"))
 				{
 					if(csAlarmType == _T("关闭->打开") && csAlarmStatus == _T("打开"))
 					{
-						m_cslistTagName.AddTail(csTagNameTmp);
+//						m_cslistTagName.AddTail(csTagNameTmp);
 
 						m_AlarmTagInfo.bFlag = 1;							//报警标志位
 						m_AlarmTagInfo.bLimitHiFlag = 0;				//模拟点高限值标志位
@@ -3467,11 +3697,12 @@ void CInterface3DDlg::AlarmChangeDbcommocxctrlfc71(BOOL bInit, long lAlarmCount,
 						m_AlarmTagInfo.dbLimiLo	=	0;					//模拟点高限值
 						m_AlarmTagInfo.dbValue	= dbTagValue;		//模拟点报警值
 						m_AlarmTagInfo.bDigType = 0;					//数字点类型
-						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
+						insertAllow=TRUE;
+//						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
 					}
 					if(csAlarmType == _T("打开->关闭") && csAlarmStatus == _T("关闭"))
 					{
-						m_cslistTagName.AddTail(csTagNameTmp);
+//						m_cslistTagName.AddTail(csTagNameTmp);
 
 						m_AlarmTagInfo.bFlag = 1;							//报警标志位
 						m_AlarmTagInfo.bLimitHiFlag = 0;				//模拟点高限值标志位
@@ -3480,16 +3711,77 @@ void CInterface3DDlg::AlarmChangeDbcommocxctrlfc71(BOOL bInit, long lAlarmCount,
 						m_AlarmTagInfo.dbLimiLo	=	0;					//模拟点高限值
 						m_AlarmTagInfo.dbValue	= dbTagValue;		//模拟点报警值
 						m_AlarmTagInfo.bDigType = 1;					//数字点类型
-						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
+						insertAllow=TRUE;
+//						m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
 					}
 				}
 			}
+			if(insertAllow){
+				WaitForSingleObject(hMutex, INFINITE);
+				m_AlarmTagInfoList.AddTail(m_AlarmTagInfo);
+				ReleaseMutex(hMutex);
+			}
+/*
+			if (m_AlarmTagInfo.bAlarmTagType == 0)	//模拟点报警发送1
+			{
+				m_bSendAlarm2 = TRUE;
+				dbValue = 1;
+			}
+			if (m_AlarmTagInfo.bFlag == 1)
+			{
+				if (m_AlarmTagInfo.bAlarmTagType == 0)	//模拟点
+				{
+					if (m_AlarmTagInfo.bLimitHiFlag == 1 && m_AlarmTagInfo.bLimitLoFlag == 0)		//高报
+					{
+						if (m_AlarmTagInfo.dbLimitHi >  dbTagValue)
+						{
+							m_bSendAlarm2 = TRUE;
+							dbValue = 2;
+						}
+					}
+					if (m_AlarmTagInfo.bLimitHiFlag == 0 && m_AlarmTagInfo.bLimitLoFlag == 1)		//低报
+					{
+						if (m_AlarmTagInfo.dbLimiLo <  dbTagValue)
+						{
+							m_bSendAlarm2 = TRUE;
+							dbValue = 2;
+						}
+					}
+				}
+				else if (m_AlarmTagInfo.bAlarmTagType == 1)	//数字点
+				{
+					if (m_AlarmTagInfo.bDigType == 0)	//关闭->打开
+					{
+												
+						if ((fabs(dbTagValue - 0) < (1E-15)))
+						{
+							m_bSendAlarm2 = TRUE;
+							dbValue = 2;
+						}
+					}
+					if (m_AlarmTagInfo.bDigType == 1)	//打开->关闭
+					{
+						if ((fabs(dbTagValue - 1) < (1E-15)))
+						{
+							m_bSendAlarm2 = TRUE;
+							dbValue = 2;
+						}
+					}
+				}
+			}
+*/
 			SysFreeString(vtTagName.bstrVal);
+//			AlarmJsonString2(m_AlarmTagInfo.csTagName,m_AlarmTagInfo.csTagDESC,dbValue,m_threadNumber-1);
+			
 		}
-	//	SysFreeString(vtTagName.bstrVal);
-		/*SafeArrayUnaccessData(pSafeArray);
-		if(pSafeArray != NULL)
-			SafeArrayDestroy(pSafeArray);*/
+		
+//		m_bSendAlarm = m_bSendAlarm2;
+		VariantClear (pbstrAla);
+//		SysFreeString(vtTagName.bstrVal);
+		SafeArrayUnaccessData(pSafeArray);
+	//	if(pSafeArray != NULL)
+		SafeArrayDestroy(pSafeArray);
 	}
+
 	csDebug.Format(_T("[hao]:	AlarmChangeDbcommocxctrlfc71   -- end"));
 }
